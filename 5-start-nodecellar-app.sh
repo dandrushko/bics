@@ -2,6 +2,12 @@
 
 set -e
 
+if [ "$EUID" -ne 0 ]
+  then echo "Please run as root"
+  exit
+fi
+
+
 function get_response_code() {
 
     port=$1
@@ -59,10 +65,12 @@ STARTUP_SCRIPT="server.js"
 
 COMMAND="${NODEJS_BINARIES_PATH}/bin/node ${NODECELLAR_SOURCE_PATH}/${STARTUP_SCRIPT}"
 
-export APP_HOST="10.10.6.25"
-export NODECELLAR_PORT="8080"
-export MONGO_HOST="10.10.6.25"
-export MONGO_PORT="27017"
+#export APP_HOST="10.10.6.25"
+#export NODECELLAR_PORT="8080"
+#export MONGO_HOST="10.10.6.25"
+#export MONGO_PORT="27017"
+
+. app.settings
 
 echo "MongoDB is located at ${MONGO_HOST}:${MONGO_PORT}"
 echo "Starting nodecellar application on port ${NODECELLAR_PORT}"

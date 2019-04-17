@@ -1,0 +1,4 @@
+export APP_HOST="10.10.6.25"
+export NODECELLAR_PORT="8080"
+export MONGO_HOST="10.10.6.25"
+export MONGO_PORT="27017"
