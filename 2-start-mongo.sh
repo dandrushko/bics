@@ -2,6 +2,12 @@
 
 set -e
 
+if [ "$EUID" -ne 0 ]
+  then echo "Please run as root"
+  exit
+fi
+
+
 function get_response_code() {
 
     port=$1
@@ -16,7 +22,7 @@ function get_response_code() {
     elif [[ ! -z ${wget_cmd} ]]; then
         response_code=$(wget --spider -S "http://localhost:${port}" 2>&1 | grep "HTTP/" | awk '{print $2}' | tail -1)
     else
-        ctx logger error "Failed to retrieve response code from http://localhost:${port}: Neither 'cURL' nor 'wget' were found on the system"
+        echo "Failed to retrieve response code from http://localhost:${port}: Neither 'cURL' nor 'wget' were found on the system"
         exit 1;
     fi
 
@@ -57,7 +63,7 @@ PORT=27017
 MONGO_ROOT_PATH="/opt/mongodb"
 MONGO_BINARIES_PATH=${MONGO_ROOT_PATH}/mongodb-binaries
 MONGO_DATA_PATH=${MONGO_ROOT_PATH}/data
-COMMAND="${MONGO_BINARIES_PATH}/bin/mongod --port ${PORT} --dbpath ${MONGO_DATA_PATH} --rest --journal --shardsvr --smallfiles"
+COMMAND="sudo ${MONGO_BINARIES_PATH}/bin/mongod --port ${PORT} --dbpath ${MONGO_DATA_PATH} --rest --journal --shardsvr --smallfiles"
 
 echo "${COMMAND}"
 nohup ${COMMAND} > /dev/null 2>&1 &
