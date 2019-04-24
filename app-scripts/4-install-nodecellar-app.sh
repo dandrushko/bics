@@ -8,7 +8,7 @@ if [ "$EUID" -ne 0 ]
 fi
 
 
-function download() {
+function download_nodecellar() {
 
    url=$1
    name=$2
@@ -36,7 +36,7 @@ function download() {
 
 }
 
-function extract() {
+function extract_nodecellar() {
 
     archive=$1
     destination=$2
@@ -91,8 +91,8 @@ NODECELLAR_SOURCE_PATH=${NODECELLAR_ROOT_PATH}/nodecellar-source
 mkdir -p ${NODECELLAR_ROOT_PATH}
 
 cd ${TEMP_DIR}
-download ${APPLICATION_URL} ${NODECELLAR_ARCHIVE_NAME}
-extract ${NODECELLAR_ARCHIVE_NAME} ${NODECELLAR_SOURCE_PATH}
+download_nodecellar ${APPLICATION_URL} ${NODECELLAR_ARCHIVE_NAME}
+extract_nodecellar ${NODECELLAR_ARCHIVE_NAME} ${NODECELLAR_SOURCE_PATH}
 
 cd ${NODECELLAR_SOURCE_PATH}
 echo "Installing nodecellar dependencies using npm"
