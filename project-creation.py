@@ -69,10 +69,25 @@ def create_tenant(sess, new_project, resource_list):
             break
 
     # Creating project unless it exists
+
     if not project_exists:
-        keystone.projects.create(name=new_project,
+        prj = keystone.projects.create(name=new_project,
                                  domain=OS_PROJECT_DOMAIN_ID,
                                  description="Automatically created project")
+        print "New project " + prj.name + " was created"
+        new_project_id = prj.id
+        admin_user_object_list = keystone.users.list(name=OS_USERNAME, domain=OS_USER_DOMAIN_NAME)
+        for user in admin_user_object_list:
+            admin_user_id  = user.id
+            # Assuming just a single user with username OS_USERNAME
+            break
+        admin_role_object_list = keystone.roles.list(name=OS_USERNAME, domain=OS_USER_DOMAIN_NAME)
+        for role in admin_role_object_list:
+            admin_role_id = role.id
+            break
+        keystone.roles.grant(role=admin_role_id, user=admin_user_id, project=new_project_id)
+        print "User " + OS_USERNAME + " was granted role with id " + admin_role_id + " on a project " + prj.name
+
     #################################
     # Authenticating on a new tenant
     auth = v3.Password(username=OS_USERNAME,
@@ -83,18 +98,6 @@ def create_tenant(sess, new_project, resource_list):
                        auth_url=OS_AUTH_URL)
 
     new_sess = session.Session(auth=auth)
-
-    # TODO: assign current user role to project and set his role!!!
-    """
-    keystone = keystone_client.Client(session=new_sess)
-    admin_user_object = keystone.users.list(name=OS_USERNAME, domain_id=OS_USER_DOMAIN_NAME)
-    print admin_user_object
-    roles = keystone.roles.list(project=new_project, domain_id=OS_USER_DOMAIN_NAME)
-    admin_role = keystone.roles.get('admin')
-    print roles
-    print admin_role
-    keystone.roles.grant(role=admin_role, user=admin_user_object, project=new_project)
-    """
 
     # Creating networks, then subnets and then routers
     neutron = neutron_client.Client(session=new_sess)
