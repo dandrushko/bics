@@ -1,0 +1,69 @@
+﻿heat_template_version: 2016-10-14
+description: Single instance definition
+
+parameters:
+  Management_net:
+    type: string
+    description: ID of MGMT network into which servers get deployed
+    default: BICS-Tenant2-MGMT-n10.10.4.0n24
+
+  DataPlane_net:
+    type: string
+    description: ID of MGMT network into which servers get deployed
+    default: BICS-Tenant2-DataPlane-n10.10.5.0n24
+
+  subnet:
+    type: string
+    description: Subnet used by the server
+    default: 0378d448-e5ea-4fd7-b5bc-807ae1667e03
+
+  security_group:
+    type: string
+    description: Subnet used by the server
+    default: cfd7a912-4877-4079-88bb-279c5cdec623
+
+  metadata:
+    type: json
+
+  pool_id:
+    type: string
+    description: Pool to contact
+
+  user_data:
+    type: string
+    description: cloud-init settings
+
+
+resources:
+  Server: 
+    type: OS::Nova::Server
+    properties: 
+      networks:
+        - network: {get_param: Management_net}
+#        - network: {get_param: DataPlane_net}
+      name: Web-FE
+      flavor: m1.small
+      image: c9e36a45-eb03-422a-afe5-3a1361764ca0
+      key_name: dadndrushko
+      security_groups: [{get_param: security_group}]
+      metadata: {get_param: metadata}
+      user_data: {get_param: user_data}
+      user_data_format: RAW
+
+
+  member:
+    type: OS::Neutron::LBaaS::PoolMember
+    properties:
+      pool: {get_param: pool_id}
+      address: {get_attr: [Server, first_address]}
+      protocol_port: 80
+      subnet: {get_param: subnet}
+
+
+outputs:
+    server_ip:
+      description: IP Address of the load-balanced server.
+      value: { get_attr: [Server, first_address] }
+    lb_member:
+      description: LB member details.
+      value: { get_attr: [member, show] }

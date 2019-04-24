@@ -1,0 +1,114 @@
+heat_template_version: 2016-10-14
+description: Scaling example
+
+parameters:
+  external_network_id:
+    type: string
+    description: External network name
+    default: "31431fe0-11d9-4772-8fa2-4db7fca3ab5c"
+
+  lb_subnet_id:
+    type: string
+    description: subnet on which the load balancer will be located
+    default: "0378d448-e5ea-4fd7-b5bc-807ae1667e03"
+
+
+resources:
+  asg:
+    type: OS::Heat::AutoScalingGroup
+    properties:
+      min_size: 1
+      max_size: 3
+      resource:
+        type: web-instance.yaml
+        properties:
+          pool_id: {get_resource: pool}
+          metadata: {"metering.server_group": {get_param: "OS::stack_id"}}
+          user_data: |
+            #!/bin/bash -v
+            apt -y update
+            apt -y install stress
+            sudo stress -c 8 --timeout 3600
+
+
+  scaleup_policy:
+    type: OS::Heat::ScalingPolicy
+    properties:
+      adjustment_type: change_in_capacity
+      auto_scaling_group_id: { get_resource: asg }
+      scaling_adjustment: 1
+
+  cpu_alarm_high:
+    type: OS::Aodh::GnocchiAggregationByResourcesAlarm
+    properties:
+      description: Scale up if CPU > 30%
+      metric: cpu_util
+      aggregation_method: mean
+      granularity: 400
+      evaluation_periods: 3
+      threshold: 3
+      resource_type: instance
+      comparison_operator: gt
+      alarm_actions:
+        - str_replace:
+            template: trust+url
+            params:
+              url: {get_attr: [scaleup_policy, signal_url]}
+      query:
+        list_join:
+          - ''
+          - - {'=': {server_group: {get_param: "OS::stack_id"}}}
+
+##### LB definition
+  monitor:
+      type: OS::Neutron::LBaaS::HealthMonitor
+      properties:
+        delay: 3
+        type: PING
+        timeout: 3
+        max_retries: 3
+        pool: { get_resource: pool }
+
+  pool:
+      type: OS::Neutron::LBaaS::Pool
+      properties:
+        lb_algorithm: ROUND_ROBIN
+        protocol: HTTP
+        listener: { get_resource: listener }
+
+  listener:
+      type: OS::Neutron::LBaaS::Listener
+      properties:
+        loadbalancer: { get_resource: lb }
+        protocol: HTTP
+        protocol_port: 80
+
+  lb:
+      type: OS::Neutron::LBaaS::LoadBalancer
+      properties:
+        vip_subnet: { get_param:  lb_subnet_id }
+
+  lb_floating:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: {get_param: external_network_id}
+      port_id: {get_attr: [lb, vip_port_id]}
+
+#####
+outputs:
+  scale_up_url:
+    description: >
+      This URL is the webhook to scale up the autoscaling group.  You
+      can invoke the scale-up operation by doing an HTTP POST to this
+      URL; no body nor extra headers are needed.
+    value: {get_attr: [scaleup_policy, alarm_url]}
+
+  gnocchi_query:
+    value:
+      str_replace:
+        template: >
+          gnocchi measures aggregation --resource-type instance
+          --query 'server_group="stackval"'
+          --granularity 300 --aggregation last -m cpu_util
+        params:
+          stackval: { get_param: "OS::stack_id" }
