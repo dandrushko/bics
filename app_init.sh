@@ -120,6 +120,53 @@ function extract_nodecellar() {
     fi
 }
 
+function get_response_code() {
+
+    port=$1
+
+    set +e
+
+    curl_cmd=$(which curl)
+
+    if [[ ! -z ${curl_cmd} ]]; then
+        response_code=$(curl -s -o /dev/null -w "%{http_code}" http://10.10.6.30:${port})
+    else
+        echo "Failed to retrieve response code from http://localhost:${port}: Neither 'cURL' nor 'wget' were found on the system"
+        exit 1;
+    fi
+
+    set -e
+
+    echo ${response_code}
+
+}
+
+function wait_for_server() {
+
+    port=$1
+    server_name=$2
+
+    started=false
+
+    echo "Running ${server_name} liveness detection on port ${port}"
+
+    for i in $(seq 1 120)
+    do
+        response_code=$(get_response_code ${port})
+        echo "[GET] http://10.10.6.30:${port} ${response_code}"
+        if [ ${response_code} -eq 200 ] ; then
+            started=true
+            break
+        else
+            echo "${server_name} has not started. waiting..."
+            sleep 1
+        fi
+    done
+    if [ ${started} = false ]; then
+        echo "${server_name} failed to start. waited for a 120 seconds."
+        exit 1
+    fi
+}
 
 TEMP_DIR='/opt'
 NODEJS_TARBALL_NAME='node-v6.9.1-linux-x64.tar.xz'
@@ -180,7 +227,15 @@ export NODECELLAR_PORT="8080"
 export MONGO_HOST="10.10.6.30"
 export MONGO_PORT="27017"
 
-echo "${COMMAND}" >> /etc/rc.local
+
+
+MONGO_REST_PORT=`expr ${MONGO_PORT} + 1000`
+wait_for_server ${MONGO_REST_PORT} 'MongoDB'
 
 nohup ${COMMAND} > /dev/null 2>&1 &
 
+sed -i s/exit\ 0//g /etc/rc.local
+echo ${COMMAND} >> /etc/rc.local
+echo "exit 0" >> /etc/rc.local
+
+echo "Nodecellar app was started"

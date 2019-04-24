@@ -69,6 +69,7 @@ echo "${COMMAND}"
 nohup ${COMMAND} > /dev/null 2>&1 &
 PID=$!
 
+PORT=27017
 MONGO_REST_PORT=`expr ${PORT} + 1000`
 wait_for_server ${MONGO_REST_PORT} 'MongoDB'
 

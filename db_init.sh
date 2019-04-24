@@ -83,10 +83,12 @@ MONGO_BINARIES_PATH=${MONGO_ROOT_PATH}/mongodb-binaries
 MONGO_DATA_PATH=${MONGO_ROOT_PATH}/data
 COMMAND="sudo ${MONGO_BINARIES_PATH}/bin/mongod --port ${PORT} --dbpath ${MONGO_DATA_PATH} --rest --journal --shardsvr --smallfiles"
 
-echo "${COMMAND}" >> /etc/rc.local
-
 nohup ${COMMAND} > /dev/null 2>&1 &
 PID=$!
+
+sed -i s/exit\ 0//g /etc/rc.local
+echo ${COMMAND} >> /etc/rc.local
+echo "exit 0" >> /etc/rc.local
 
 
 
