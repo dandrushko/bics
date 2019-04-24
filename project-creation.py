@@ -95,9 +95,9 @@ def create_tenant(sess, new_project, resource_list):
     print admin_role
     keystone.roles.grant(role=admin_role, user=admin_user_object, project=new_project)
     """
-    neutron = neutron_client.Client(session=new_sess)
 
     # Creating networks, then subnets and then routers
+    neutron = neutron_client.Client(session=new_sess)
     # This map will store newly created old <-> new net id mapping
     old_network_ids={}
     # Creating networks from source tenant
@@ -105,8 +105,10 @@ def create_tenant(sess, new_project, resource_list):
         new_net = neutron.create_network({'network':{
             'name': network['name']}})
         old_network_ids[network['id']] = new_net['network']['id']
-
+        print "Network " + network['name'] + " was created"
     # Creating subnets from the source tenant and attaching them to the newly created networks
+    # This map will store newly created old <-> new subnet id mapping
+    old_subnet_ids={}
     for subnet in resource_list['subnets']:
          new_subnet = neutron.create_subnet({'subnet': {
             'network_id': old_network_ids[subnet['network_id']],
@@ -117,52 +119,31 @@ def create_tenant(sess, new_project, resource_list):
             'gateway_ip': subnet['gateway_ip'],
             'name': subnet['name'],
             'ip_version': subnet['ip_version']}})
+         print "Subnet " + subnet['name'] + " was created and attached to network " + \
+               old_network_ids[subnet['network_id']]
+         old_subnet_ids[subnet['id']] = new_subnet['subnet']['id']
 
     for router in resource_list['routers']:
-        new_router = neutron.create_router({
+        new_router = neutron.create_router({'router':{
             'name': router['name'],
             'admin_state_up': True
-        })
+        }})
+        print "Router " + router['name'] + " was created"
         # Attaching router to subnets
         original_router_id = router['id']
         for port in resource_list[original_router_id]['ports']:
             # We might have either internal or exernal/gw port
             if port['device_owner'] == 'network:router_gateway':
-                neutron.add_gateway_router(new_router['router'], {'network_id': port['network_id']})
+                neutron.add_gateway_router(new_router['router']['id'], {'network_id': port['network_id']})
+                print "Router gateway interface was added"
 
             elif port['device_owner'] == 'network:router_interface':
-                neutron.add_interface_router(new_router['router']['id'], subnet_id)
+                # Extracting new subnet id from the mapping and resource_list
+                old_port_subnet_id = port['fixed_ips'][0]['subnet_id']
+                new_subnet_id = old_subnet_ids[old_port_subnet_id]
+                neutron.add_interface_router(new_router['router']['id'], {'subnet_id': new_subnet_id})
+                print "Router internal interface was added"
 
-
-
-    # Iterating over resources map and creating appropariate tenant resources
-    """    
-    for resource in resource_list:
-        print resource
-        if resource == 'networks':
-            for network in resource_list['networks']:
-                print network
-        if resource == 'subnets':
-            for subnet in resource_list['subnets']:
-                print subnet
-        if resource == 'routers':
-            for subnet in resource_list['routers']:
-                print subnet
-
-    #subnets = neutron.create_subnet({'subnet':{
-            'network_id': net1['id'],
-            'cidr': '192.168.1.0/24',
-            'enable_dhcp': False,
-            'gateway_ip': None,
-            'ip_version': 4}})
-
-
-    #net2 = neutron.create_network({'network':{'name': 'net-2',
-                  'provider:physical_network': PHYSNET,
-                  'provider:network_type': 'vlan',
-                  'provider:segmentation_id': 20}})
-
-    """
     return
 
 if __name__ == "__main__":
