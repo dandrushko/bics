@@ -72,21 +72,21 @@ resources:
     properties:
       name: "FE-MGMT-Port"
       network_id: {get_param: Management_net}
-      fixed_ips: [{"subnet": "953369ad-d9b5-48b3-b90e-d803b2bca3bb", "ip_address": 10.10.6.15}]
+      fixed_ips: [{"subnet": {get_param: Mgmt_subnet}, "ip_address": 10.10.6.15}]
 
   App-MGMT-Port:
     type: OS::Neutron::Port
     properties:
       name: "FE-MGMT-Port"
       network_id: {get_param: Management_net}
-      fixed_ips: [{"subnet": "953369ad-d9b5-48b3-b90e-d803b2bca3bb", "ip_address": 10.10.6.20}]
+      fixed_ips: [{"subnet": {get_param: Mgmt_subnet}, "ip_address": 10.10.6.20}]
 
   DB-MGMT-Port:
     type: OS::Neutron::Port
     properties:
       name: "FE-MGMT-Port"
       network_id: {get_param: Management_net}
-      fixed_ips: [{"subnet": "953369ad-d9b5-48b3-b90e-d803b2bca3bb", "ip_address": 10.10.6.30}]
+      fixed_ips: [{"subnet": {get_param: Mgmt_subnet}, "ip_address": 10.10.6.30}]
 
   floating_ip:
     type: "OS::Neutron::FloatingIP"

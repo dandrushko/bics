@@ -2,6 +2,11 @@ from keystoneauth1 import session
 from keystoneauth1.identity import v3
 from keystoneclient.v3 import client as keystone_client
 from neutronclient.v2_0 import client as neutron_client
+from heatclient.client import Client as heat_client
+from heatclient.common import template_utils
+from neutronclient.common.exceptions import Conflict
+import re
+
 
 # "BICS-Tenant2"
 OS_USERNAME = "admin"
@@ -14,9 +19,9 @@ OS_USER_DOMAIN_NAME="default"
 
 # New Tenant Name
 NEW_PROJECT = "BICS-Tenant3"
+new_project_id = ''
 
-
-def launch_test():
+def launch_app():
 
     auth = v3.Password(username=OS_USERNAME,
                               password=OS_PASSWORD,
@@ -72,8 +77,8 @@ def create_tenant(sess, new_project, resource_list):
 
     if not project_exists:
         prj = keystone.projects.create(name=new_project,
-                                 domain=OS_PROJECT_DOMAIN_ID,
-                                 description="Automatically created project")
+                                       domain=OS_PROJECT_DOMAIN_ID,
+                                       description="Automatically created project")
         print "New project " + prj.name + " was created"
         new_project_id = prj.id
         admin_user_object_list = keystone.users.list(name=OS_USERNAME, domain=OS_USER_DOMAIN_NAME)
@@ -98,9 +103,11 @@ def create_tenant(sess, new_project, resource_list):
                        auth_url=OS_AUTH_URL)
 
     new_sess = session.Session(auth=auth)
+    neutron = neutron_client.Client(session=new_sess)
+
+    alter_security_group(new_sess,keystone,new_project,neutron)
 
     # Creating networks, then subnets and then routers
-    neutron = neutron_client.Client(session=new_sess)
     # This map will store newly created old <-> new net id mapping
     old_network_ids={}
     # Creating networks from source tenant
@@ -112,8 +119,9 @@ def create_tenant(sess, new_project, resource_list):
     # Creating subnets from the source tenant and attaching them to the newly created networks
     # This map will store newly created old <-> new subnet id mapping
     old_subnet_ids={}
+
     for subnet in resource_list['subnets']:
-         new_subnet = neutron.create_subnet({'subnet': {
+        new_subnet = neutron.create_subnet({'subnet': {
             'network_id': old_network_ids[subnet['network_id']],
             'cidr': subnet['cidr'],
             'allocation_pools': subnet['allocation_pools'],
@@ -122,10 +130,11 @@ def create_tenant(sess, new_project, resource_list):
             'gateway_ip': subnet['gateway_ip'],
             'name': subnet['name'],
             'ip_version': subnet['ip_version']}})
-         print "Subnet " + subnet['name'] + " was created and attached to network " + \
-               old_network_ids[subnet['network_id']]
-         old_subnet_ids[subnet['id']] = new_subnet['subnet']['id']
+        print "Subnet " + subnet['name'] + " was created and attached to network " + \
+              old_network_ids[subnet['network_id']]
+        old_subnet_ids[subnet['id']] = new_subnet['subnet']['id']
 
+    # Creating Tenant Routers
     for router in resource_list['routers']:
         new_router = neutron.create_router({'router':{
             'name': router['name'],
@@ -135,11 +144,11 @@ def create_tenant(sess, new_project, resource_list):
         # Attaching router to subnets
         original_router_id = router['id']
         for port in resource_list[original_router_id]['ports']:
+
             # We might have either internal or exernal/gw port
             if port['device_owner'] == 'network:router_gateway':
                 neutron.add_gateway_router(new_router['router']['id'], {'network_id': port['network_id']})
                 print "Router gateway interface was added"
-
             elif port['device_owner'] == 'network:router_interface':
                 # Extracting new subnet id from the mapping and resource_list
                 old_port_subnet_id = port['fixed_ips'][0]['subnet_id']
@@ -147,7 +156,58 @@ def create_tenant(sess, new_project, resource_list):
                 neutron.add_interface_router(new_router['router']['id'], {'subnet_id': new_subnet_id})
                 print "Router internal interface was added"
 
+    # Modify default security group to enable App traffic
+    # Calling App redeployment
+    deploy_app(new_sess, neutron, keystone, new_project)
+
     return
 
+
+def alter_security_group(session, keystone, new_project, neutron):
+    # Altering default security groups for app to work
+    new_project_obj = [prj for prj in keystone.projects.list() if prj.name == new_project]
+    sg = neutron.list_security_groups(project_id=new_project_obj[0].id)
+    default_sg = sg['security_groups'][0]
+    try:
+        neutron.create_security_group_rule({'security_group_rule':
+                                                {'security_group_id': default_sg['id'], 'protocol': 'icmp',
+                                                 'direction': 'ingress'}})
+    except Conflict:
+        print "Rule already exists"
+
+    try:
+        neutron.create_security_group_rule({'security_group_rule':
+                                                {'security_group_id': default_sg['id'],
+                                                 'protocol': 'tcp',
+                                                 'direction': 'ingress'}})
+    except Conflict:
+        print "Rule already exists"
+
+    return
+
+
+def deploy_app(new_sess, neutron, keystone, new_project):
+    # Rebuilding app
+    new_project_obj = [prj for prj in keystone.projects.list() if prj.name == new_project]
+    neutron_resources = neutron.list_networks(project_id=new_project_obj[0].id)
+
+    # Redeployng App
+    #Assuming App management netwrk will have MGMT in the name and DataPlane for dp network
+    mgmt = [net for net in neutron_resources['networks'] if 'MGMT' in net['name'] ]
+    dp = [net for net in neutron_resources['networks'] if 'DataPlane' in net['name']]
+    resources_dict = {}
+    resources_dict['Management_net'] = mgmt[0]['id']
+    resources_dict['Mgmt_subnet'] = mgmt[0]['subnets'][0]
+    resources_dict['DataPlane_net'] = dp[0]['id']
+    resources_dict['DP_subnet'] = dp[0]['subnets'][0]
+
+    heat = heat_client('1', session=new_sess)
+    files, template = template_utils.process_template_path('service-deployment.yaml')
+    res = heat.stacks.create(stack_name='App',template=template,
+                       files=files,
+                       parameters=resources_dict)
+    print "App redeployment was started"
+
+
 if __name__ == "__main__":
-    launch_test()
+    launch_app()
