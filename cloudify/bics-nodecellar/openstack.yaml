@@ -316,7 +316,7 @@ groups:
         type: scale_policy_type
         properties:
           policy_operates_on_group: true
-          scale_limit: 2
+          scale_limit: 5
           scale_direction: '<'
           scale_threshold: 10
           service_selector: .*nodejs_host.*.process.node.cpu.percent
@@ -337,7 +337,7 @@ groups:
       auto_scale_down:
         type: scale_policy_type
         properties:
-          scale_limit: 2
+          scale_limit: 5
           scale_direction: '>'
           scale_threshold: 1
           service_selector: .*nodejs_host.*.process.node.cpu.percent
@@ -360,7 +360,7 @@ groups:
         properties:
           service:
             - .*nodejs_host.*.cpu.total.system
-          interval_between_workflows: 120
+          interval_between_workflows: 300
         triggers:
           auto_heal_trigger:
             type: cloudify.policies.triggers.execute_workflow

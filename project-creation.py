@@ -5,7 +5,6 @@ from neutronclient.v2_0 import client as neutron_client
 from heatclient.client import Client as heat_client
 from heatclient.common import template_utils
 from neutronclient.common.exceptions import Conflict
-import re
 
 
 # "BICS-Tenant2"
