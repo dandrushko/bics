@@ -316,9 +316,9 @@ groups:
         type: scale_policy_type
         properties:
           policy_operates_on_group: true
-          scale_limit: 5
+          scale_limit: 6
           scale_direction: '<'
-          scale_threshold: 10
+          scale_threshold: 6
           service_selector: .*nodejs_host.*.process.node.cpu.percent
           cooldown_time: 60
         triggers:
@@ -337,7 +337,7 @@ groups:
       auto_scale_down:
         type: scale_policy_type
         properties:
-          scale_limit: 5
+          scale_limit: 2
           scale_direction: '>'
           scale_threshold: 1
           service_selector: .*nodejs_host.*.process.node.cpu.percent
