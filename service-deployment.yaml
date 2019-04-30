@@ -14,12 +14,12 @@ parameters:
 
   Mgmt_subnet:
     type: string
-    description: Subnet used by the server
+    description: Management subnet used by the servers
     default: 953369ad-d9b5-48b3-b90e-d803b2bca3bb
 
   DP_subnet:
     type: string
-    description: Subnet used by the server
+    description: Data Plane subnet for FE server
     default: 963fe538-eb3b-47d5-b825-f09d8999d428
 
   security_group:
@@ -34,6 +34,7 @@ resources:
     properties:
       networks:
         - port: {get_resource: FE-MGMT-Port}
+        - port: {get_resource: FE-DP-Port}
       name: FE-Web
       flavor: m1.small
       image: c9e36a45-eb03-422a-afe5-3a1361764ca0
@@ -74,6 +75,13 @@ resources:
       network_id: {get_param: Management_net}
       fixed_ips: [{"subnet": {get_param: Mgmt_subnet}, "ip_address": 10.10.6.15}]
 
+  FE-DP-Port:
+    type: OS::Neutron::Port
+    properties:
+      name: "FE-DP-Port"
+      network_id: {get_param: DataPlane_net}
+
+
   App-MGMT-Port:
     type: OS::Neutron::Port
     properties:
@@ -92,4 +100,4 @@ resources:
     type: "OS::Neutron::FloatingIP"
     properties:
       floating_network_id: "external-net2"
-      port_id: {get_resource: "FE-MGMT-Port"}
+      port_id: {get_resource: "FE-DP-Port"}
