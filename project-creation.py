@@ -159,7 +159,6 @@ def check_project(keystone, new_project):
         if project.name.encode('utf-8') == new_project.encode('utf-8'):
             print "Project " + new_project + " already exists"
             return True
-            break
     return False
 
 
