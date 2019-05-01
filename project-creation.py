@@ -13,21 +13,22 @@ OS_PASSWORD = "VMware1!"
 OS_PROJECT_NAME = "BICS-Tenant1"
 OS_PROJECT_ID = "5d45ab8c60c44f6f925a284298762cb9"
 OS_AUTH_URL = "https://vio-demo.vmw-nfv.wdc:5000/v3/"
-OS_PROJECT_DOMAIN_ID="default"
-OS_USER_DOMAIN_NAME="default"
+OS_PROJECT_DOMAIN_ID = "default"
+OS_USER_DOMAIN_NAME = "default"
 
 # New Tenant Name
 NEW_PROJECT = "BICS-Tenant3"
 new_project_id = ''
 
+
 def launch_app():
 
     auth = v3.Password(username=OS_USERNAME,
-                              password=OS_PASSWORD,
-                              project_id = OS_PROJECT_ID,
-                              project_domain_id=OS_PROJECT_DOMAIN_ID,
-                              user_domain_id=OS_USER_DOMAIN_NAME,
-                              auth_url=OS_AUTH_URL)
+                       password=OS_PASSWORD,
+                       project_id=OS_PROJECT_ID,
+                       project_domain_id=OS_PROJECT_DOMAIN_ID,
+                       user_domain_id=OS_USER_DOMAIN_NAME,
+                       auth_url=OS_AUTH_URL)
     sess = session.Session(auth=auth)
     resources = get_tenant_resources(sess)
 
@@ -67,34 +68,20 @@ def get_tenant_resources(session):
 def create_tenant(sess, new_project, resource_list):
 
     # Let's check do we already project with this name
-    project_exists = False
     keystone = keystone_client.Client(session=sess)
-    projects = keystone.projects.list()
-    for project in projects:
-        if project.name == new_project:
-            print "Project " + new_project + " already exists"
-            project_exists = True
-            break
+    project_exists = check_project(keystone, new_project)
 
     # Creating project unless it exists
-
     if not project_exists:
         prj = keystone.projects.create(name=new_project,
                                        domain=OS_PROJECT_DOMAIN_ID,
                                        description="Automatically created project")
         print "New project " + prj.name + " was created"
-        new_project_id = prj.id
         admin_user_object_list = keystone.users.list(name=OS_USERNAME, domain=OS_USER_DOMAIN_NAME)
-        for user in admin_user_object_list:
-            admin_user_id  = user.id
-            # Assuming just a single user with username OS_USERNAME
-            break
         admin_role_object_list = keystone.roles.list(name=OS_USERNAME, domain=OS_USER_DOMAIN_NAME)
-        for role in admin_role_object_list:
-            admin_role_id = role.id
-            break
-        keystone.roles.grant(role=admin_role_id, user=admin_user_id, project=new_project_id)
-        print "User " + OS_USERNAME + " was granted role with id " + admin_role_id + " on a project " + prj.name
+        keystone.roles.grant(role=admin_role_object_list[0].id, user=admin_user_object_list[0].id, project=prj.id)
+        print "User " + OS_USERNAME + " was granted role with id " + admin_role_object_list[0].id +\
+              " on a project " + prj.name
 
     #################################
     # Authenticating on a new tenant
@@ -164,6 +151,16 @@ def create_tenant(sess, new_project, resource_list):
     deploy_app(new_sess, neutron, keystone, new_project)
 
     return
+
+
+def check_project(keystone, new_project):
+    projects = keystone.projects.list()
+    for project in projects:
+        if project.name.encode('utf-8') == new_project.encode('utf-8'):
+            print "Project " + new_project + " already exists"
+            return True
+            break
+    return False
 
 
 def alter_security_group(session, keystone, new_project, neutron):
