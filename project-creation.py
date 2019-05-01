@@ -44,18 +44,22 @@ def get_tenant_resources(session):
     # Getting networks map. We need to filter out tenant networks
     nets = neutron.list_networks(project_id=OS_PROJECT_ID)
     resources['networks'] = nets['networks']
+    print "Captured networks information from the original project " + OS_PROJECT_NAME
 
     # Getting subnetworks map
     subnets = neutron.list_subnets(project_id=OS_PROJECT_ID)
     resources['subnets'] = subnets['subnets']
+    print "Captured subnets information from the original project " + OS_PROJECT_NAME
 
     # Getting tenant routers list + router ports
     routers = neutron.list_routers(project_id=OS_PROJECT_ID)
     resources['routers'] = routers['routers']
+    print "Captured Routers information from the original project " + OS_PROJECT_NAME
     # Saving Router ports
     for router in resources['routers']:
         ports = neutron.list_ports(device_id=router['id'])
         resources[router['id']]=ports
+    print "Captured Router ports binding from the original project " + OS_PROJECT_NAME
 
     return resources
 
@@ -167,6 +171,7 @@ def alter_security_group(session, keystone, new_project, neutron):
     new_project_obj = [prj for prj in keystone.projects.list() if prj.name == new_project]
     sg = neutron.list_security_groups(project_id=new_project_obj[0].id)
     default_sg = sg['security_groups'][0]
+    print "Updating Security Groups configuration in the project " + new_project
     try:
         neutron.create_security_group_rule({'security_group_rule':
                                                 {'security_group_id': default_sg['id'], 'protocol': 'icmp',
