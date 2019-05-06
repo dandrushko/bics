@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #We'll hardcode to use DataPlane interface as default GW, instead of one configured via cloud-init
-ip l set dev ens33 up
-route delete default
-dhclient ens33
+#ip l set dev ens33 up
+#route delete default
+#dhclient ens33
 
 # Install software
 apt -y update

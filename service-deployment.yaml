@@ -33,7 +33,6 @@ resources:
     type: OS::Nova::Server
     properties:
       networks:
-        - port: {get_resource: FE-MGMT-Port}
         - port: {get_resource: FE-DP-Port}
       name: FE-Web
       flavor: m1.small
